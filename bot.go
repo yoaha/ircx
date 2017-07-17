@@ -108,11 +108,8 @@ func (b *Bot) Reconnect() error {
 	return nil
 }
 
-// ReadLoop sets a timeout of 300 seconds, and then attempts to read
-// from the IRC server. If there is an error, it calls Reconnect
 func (b *Bot) ReadLoop() error {
 	for {
-		b.conn.SetDeadline(time.Now().Add(300 * time.Second))
 		msg, err := b.reader.Decode()
 		if err != nil {
 			return b.Reconnect()
