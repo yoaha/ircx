@@ -11,6 +11,8 @@ import (
 
 // Bot contains all of the information necessary to run a single IRC client
 type Bot struct {
+	LAddr        *net.TCPAddr
+	RAddr        *net.TCPAddr
 	Server       string
 	OriginalName string
 	Config       Config
@@ -32,8 +34,16 @@ type Config struct {
 }
 
 // New creates a new IRC bot with the specified server, name and config
-func New(server, name string, config Config) *Bot {
+func New(local, server, name string, config Config) *Bot {
+	raddr, err := net.ResolveTCPAddr("tcp", server)
+	if err != nil {
+		return nil
+	}
 	b := &Bot{
+		LAddr: &net.TCPAddr{
+			IP: net.ParseIP(local),
+		},
+		RAddr:        raddr,
 		Server:       server,
 		OriginalName: name,
 		Config:       config,
@@ -48,13 +58,17 @@ func New(server, name string, config Config) *Bot {
 func (b *Bot) Connect() error {
 	var conn net.Conn
 	var err error
-	if b.Config.TLSConfig == nil {
-		conn, err = net.Dial("tcp", b.Server)
-	} else {
-		conn, err = tls.Dial("tcp", b.Server, b.Config.TLSConfig)
-	}
+	conn, err = net.DialTCP("tcp", b.LAddr, b.RAddr)
 	if err != nil {
 		return err
+	}
+	if b.Config.TLSConfig != nil {
+		sconn := tls.Client(conn, b.Config.TLSConfig)
+		err = sconn.Handshake()
+		if err != nil {
+			return err
+		}
+		conn = sconn
 	}
 	b.conn = conn
 	b.reader = irc.NewDecoder(conn)
